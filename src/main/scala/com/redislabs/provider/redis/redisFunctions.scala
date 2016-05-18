@@ -247,6 +247,20 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
   }
 
   /**
+    * @param setKvs RDD of (setName, member, value)
+    * @param ttl time to live
+    */
+  def redisZincrby(setKvs: RDD[(String, String, Double)], ttl: Int = 0)
+                 (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))) {
+    val grouped = setKvs.groupBy(_._1)
+    grouped.foreachPartition { partition =>
+      for (iter <- partition) {
+        setZsetZincrby(iter._1, iter._2.map(setKvs => (setKvs._2, setKvs._3)).toIterator, ttl, redisConfig)
+      }
+    }
+  }
+
+  /**
     * @param vs      RDD of values
     * @param setName target set's name which hold all the vs
     * @param ttl time to live
@@ -332,6 +346,21 @@ object RedisContext extends Serializable {
     val conn = redisConfig.connectionForKey(zsetName)
     val pipeline = conn.pipelined
     arr.foreach(x => pipeline.zadd(zsetName, x._2.toDouble, x._1))
+    if (ttl > 0) pipeline.expire(zsetName, ttl)
+    pipeline.sync
+    conn.close
+  }
+
+  /**
+    * @param zsetName
+    * @param arr k/vs which should be saved in the target host
+    *            save all the k/vs to zsetName(zset type) to the target host
+    * @param ttl time to live
+    */
+  def setZsetZincrby(zsetName: String, arr: Iterator[(String, Double)], ttl: Int, redisConfig: RedisConfig) {
+    val conn = redisConfig.connectionForKey(zsetName)
+    val pipeline = conn.pipelined
+    arr.foreach(x => pipeline.zincrby(zsetName, x._2, x._1))
     if (ttl > 0) pipeline.expire(zsetName, ttl)
     pipeline.sync
     conn.close
