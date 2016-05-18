@@ -65,6 +65,39 @@ class RedisKVRDD(prev: RDD[String],
   }
 }
 
+class RedisKFVRDD(prev: RDD[String],
+                 val rddType: String)
+  extends RDD[(String, String, String)](prev) with Keys {
+
+  override def getPartitions: Array[Partition] = prev.partitions
+
+  override def compute(split: Partition, context: TaskContext): Iterator[(String, String, String)] = {
+    val partition: RedisPartition = split.asInstanceOf[RedisPartition]
+    val sPos = partition.slots._1
+    val ePos = partition.slots._2
+    val nodes = partition.redisConfig.getNodesBySlots(sPos, ePos)
+    val keys = firstParent[String].iterator(split, context)
+    val auth = partition.redisConfig.getAuth
+    val db = partition.redisConfig.getDB
+    rddType match {
+      case "hashKeys" => getHashWithKeys(nodes, keys)
+    }
+  }
+
+  def getHashWithKeys(nodes: Array[RedisNode], keys: Iterator[String]): Iterator[(String, String, String)] = {
+    groupKeysByNode(nodes, keys).flatMap {
+      x =>
+      {
+        val conn = x._1.endpoint.connect()
+        val hashKeys = filterKeysByType(conn, x._2, "hash")
+        val res = hashKeys.flatMap(k => conn.hgetAll(k).map({ case (f, v) => (k, f, v) })).iterator
+        conn.close
+        res
+      }
+    }.iterator
+  }
+}
+
 class RedisListRDD(prev: RDD[String], val rddType: String) extends RDD[String](prev) with Keys {
 
   override def getPartitions: Array[Partition] = prev.partitions
@@ -173,6 +206,9 @@ class RedisZSetRDD[T: ClassTag](prev: RDD[String],
           if (classTag[T] == classTag[(String, Double)]) {
             zsetKeys.flatMap(k => conn.zrangeByScoreWithScores(k, startScore, endScore)).
               map(tup => (tup.getElement, tup.getScore)).iterator
+          } else if (classTag[T] == classTag[(String, String, Double)]) {
+            zsetKeys.flatMap(k => conn.zrangeByScoreWithScores(k, startScore, endScore).
+              map(tup => (k, tup.getElement, tup.getScore))).iterator
           } else if (classTag[T] == classTag[String]) {
             zsetKeys.flatMap(k => conn.zrangeByScore(k, startScore, endScore)).iterator
           } else {
@@ -301,6 +337,13 @@ class RedisKeysRDD(sc: SparkContext,
     new RedisKVRDD(this, "hash")
   }
   /**
+    * filter the 'hash' type keys and get all the elements of them, with keys
+    * @return RedisKVFRDD[(String, String, String)]
+    */
+  def getHashWithKeys(): RDD[(String, String, String)] = {
+    new RedisKFVRDD(this, "hashKeys")
+  }
+  /**
     * filter the 'zset' type keys and get all the elements(without scores) of them
     * @return RedisZSetRDD[String]
     */
@@ -315,6 +358,14 @@ class RedisKeysRDD(sc: SparkContext,
   def getZSetWithScore(): RDD[(String, Double)] = {
     val zsetContext: ZSetContext = new ZSetContext(0, -1, Double.MinValue, Double.MaxValue, true, "byRange")
     new RedisZSetRDD(this, zsetContext, classOf[(String, Double)])
+  }
+  /**
+    * filter the 'zset' type keys and get all the elements(with scores) of them, with keys
+    * @return RedisZSetRDD[(String, String, Double)]
+    */
+  def getZSetWithScoreAndKey(): RDD[(String, String, Double)] = {
+    val zsetContext: ZSetContext = new ZSetContext(0, -1, Double.MinValue, Double.MaxValue, true, "byRange")
+    new RedisZSetRDD(this, zsetContext, classOf[(String, String, Double)])
   }
   /**
     * filter the 'zset' type keys and get all the elements(without scores) of range [startPos, endPos]

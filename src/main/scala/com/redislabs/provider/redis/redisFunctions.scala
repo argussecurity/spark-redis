@@ -108,6 +108,22 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
   /**
     * @param keysOrKeyPattern an array of keys or a key pattern
     * @param partitionNum number of partitions
+    * @return RedisHashRDD of related Key-Field-Values stored in redis server
+    */
+  def fromRedisHashWithKeys[T](keysOrKeyPattern: T,
+                       partitionNum: Int = 3)
+                      (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))):
+  RDD[(String, String, String)] = {
+    keysOrKeyPattern match {
+      case keyPattern: String => fromRedisKeyPattern(keyPattern, partitionNum)(redisConfig).getHashWithKeys
+      case keys: Array[String] => fromRedisKeys(keys, partitionNum)(redisConfig).getHashWithKeys
+      case _ => throw new scala.Exception("KeysOrKeyPattern should be String or Array[String]")
+    }
+  }
+
+  /**
+    * @param keysOrKeyPattern an array of keys or a key pattern
+    * @param partitionNum number of partitions
     * @return RedisZSetRDD of Keys in related ZSets stored in redis server
     */
   def fromRedisZSet[T](keysOrKeyPattern: T,
@@ -133,6 +149,22 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
     keysOrKeyPattern match {
       case keyPattern: String => fromRedisKeyPattern(keyPattern, partitionNum)(redisConfig).getZSetWithScore
       case keys: Array[String] => fromRedisKeys(keys, partitionNum)(redisConfig).getZSetWithScore
+      case _ => throw new scala.Exception("KeysOrKeyPattern should be String or Array[String]")
+    }
+  }
+
+  /**
+    * @param keysOrKeyPattern an array of keys or a key pattern
+    * @param partitionNum number of partitions
+    * @return RedisHashRDD of related Key-Field-Values stored in redis server
+    */
+  def fromRedisZSetWithKeys[T](keysOrKeyPattern: T,
+                               partitionNum: Int = 3)
+                              (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))):
+  RDD[(String, String, Double)] = {
+    keysOrKeyPattern match {
+      case keyPattern: String => fromRedisKeyPattern(keyPattern, partitionNum)(redisConfig).getZSetWithScoreAndKey
+      case keys: Array[String] => fromRedisKeys(keys, partitionNum)(redisConfig).getZSetWithScoreAndKey
       case _ => throw new scala.Exception("KeysOrKeyPattern should be String or Array[String]")
     }
   }
