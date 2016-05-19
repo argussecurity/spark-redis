@@ -158,13 +158,13 @@ class RedisContext(@transient val sc: SparkContext) extends Serializable {
     * @param partitionNum number of partitions
     * @return RedisHashRDD of related Key-Field-Values stored in redis server
     */
-  def fromRedisZSetWithKeys[T](keysOrKeyPattern: T,
-                               partitionNum: Int = 3)
-                              (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))):
+  def fromRedisZSetWithScoreAndKeys[T](keysOrKeyPattern: T,
+                                       partitionNum: Int = 3)
+                                      (implicit redisConfig: RedisConfig = new RedisConfig(new RedisEndpoint(sc.getConf))):
   RDD[(String, String, Double)] = {
     keysOrKeyPattern match {
-      case keyPattern: String => fromRedisKeyPattern(keyPattern, partitionNum)(redisConfig).getZSetWithScoreAndKey
-      case keys: Array[String] => fromRedisKeys(keys, partitionNum)(redisConfig).getZSetWithScoreAndKey
+      case keyPattern: String => fromRedisKeyPattern(keyPattern, partitionNum)(redisConfig).getZSetWithScoreAndKeys
+      case keys: Array[String] => fromRedisKeys(keys, partitionNum)(redisConfig).getZSetWithScoreAndKeys
       case _ => throw new scala.Exception("KeysOrKeyPattern should be String or Array[String]")
     }
   }

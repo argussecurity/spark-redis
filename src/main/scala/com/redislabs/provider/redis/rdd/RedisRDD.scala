@@ -363,7 +363,7 @@ class RedisKeysRDD(sc: SparkContext,
     * filter the 'zset' type keys and get all the elements(with scores) of them, with keys
     * @return RedisZSetRDD[(String, String, Double)]
     */
-  def getZSetWithScoreAndKey(): RDD[(String, String, Double)] = {
+  def getZSetWithScoreAndKeys(): RDD[(String, String, Double)] = {
     val zsetContext: ZSetContext = new ZSetContext(0, -1, Double.MinValue, Double.MaxValue, true, "byRange")
     new RedisZSetRDD(this, zsetContext, classOf[(String, String, Double)])
   }
