@@ -181,6 +181,9 @@ class RedisZSetRDD[T: ClassTag](prev: RDD[String],
           if (classTag[T] == classTag[(String, Double)]) {
             zsetKeys.flatMap(k => conn.zrangeWithScores(k, startPos, endPos)).
               map(tup => (tup.getElement, tup.getScore)).iterator
+          } else if (classTag[T] == classTag[(String, String, Double)]) {
+            zsetKeys.flatMap(k => conn.zrangeWithScores(k, startPos, endPos).
+              map(tup => (k, tup.getElement, tup.getScore))).iterator
           } else if (classTag[T] == classTag[String]) {
             zsetKeys.flatMap(k => conn.zrange(k, startPos, endPos)).iterator
           } else {
@@ -206,9 +209,6 @@ class RedisZSetRDD[T: ClassTag](prev: RDD[String],
           if (classTag[T] == classTag[(String, Double)]) {
             zsetKeys.flatMap(k => conn.zrangeByScoreWithScores(k, startScore, endScore)).
               map(tup => (tup.getElement, tup.getScore)).iterator
-          } else if (classTag[T] == classTag[(String, String, Double)]) {
-            zsetKeys.flatMap(k => conn.zrangeByScoreWithScores(k, startScore, endScore).
-              map(tup => (k, tup.getElement, tup.getScore))).iterator
           } else if (classTag[T] == classTag[String]) {
             zsetKeys.flatMap(k => conn.zrangeByScore(k, startScore, endScore)).iterator
           } else {
